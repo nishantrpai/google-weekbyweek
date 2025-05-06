@@ -1,5 +1,5 @@
-// Google Week by Week Search Extension
-// Adds functionality to search Google results one week at a time
+// Week by Week Search Extension
+// Adds functionality to search Google, YouTube and Twitter results one week at a time
 
 // Main entry point for the content script
 (function() {
@@ -8,26 +8,68 @@
   // Configuration
   const config = {
     calendarIconSize: '20px',
-    calendarIconColor: '#5f6368', // Google's gray color
-    activeIconColor: '#1a73e8', // Google's blue color
+    calendarIconColor: '#5f6368', // Default gray color
+    activeIconColor: '#1a73e8', // Default blue color
     datePickerWidth: '300px',
-    animationDuration: '0.2s'
+    animationDuration: '0.2s',
+    // Initialization configuration
+    initDelay: {
+      google: 100,   // Google loads quickly
+      youtube: 2000, // YouTube needs more time for SPA to render
+      twitter: 1500  // Twitter also needs time for SPA to render
+    },
+    maxRetries: 3,   // Maximum number of retries when searching for elements
+    retryDelay: 1500, // Delay between retries in milliseconds
+    // Site-specific configurations
+    sites: {
+      google: {
+        activeIconColor: '#1a73e8', // Google blue
+        searchFormSelector: 'form[role="search"], form#tsf, form.search-form',
+        searchButtonSelector: 'button[type="submit"], button[aria-label="Google Search"]',
+        urlParam: 'tbs'
+      },
+      youtube: {
+        activeIconColor: '#f00', // YouTube red
+        searchFormSelector: 'form#search-form, ytd-searchbox[role="search"], #container.ytSearchboxComponentInputBox',
+        searchButtonSelector: 'button#search-icon-legacy, yt-icon-button.ytd-searchbox, button.ytSearchboxComponentButton',
+        urlParam: 'sp'
+      },
+      twitter: {
+        activeIconColor: '#1DA1F2', // Twitter blue
+        searchFormSelector: 'input[aria-label="Search query"]',
+        searchButtonSelector: 'div[data-testid="SearchBox_Search_Button"]',
+        urlParam: 'since',
+        iconSize: '24px' // Bigger icon size for Twitter
+      }
+    }
   };
   
   // Global state
   let isDatePickerVisible = false;
   let selectedStartDate = null;
   let selectedEndDate = null;
+  let currentSite = null;
+  let initAttempts = 0;
   
   /**
    * Initialize the extension
    */
   function init() {
-    console.log('Initializing Google Week by Week extension');
+    console.log('Initializing Week by Week Search extension');
     
-    // Check if we're on a Google search results page
-    if (isGoogleSearchPage()) {
-      initializeWeekByWeekSearch();
+    // Detect which site we're on
+    currentSite = detectSite();
+    
+    // Only proceed if we're on a supported site
+    if (currentSite) {
+      // Get site-specific delay
+      const delay = config.initDelay[currentSite] || 500;
+      console.log(`Delaying initialization for ${delay}ms on ${currentSite}`);
+      
+      // Delay initialization to ensure page has fully loaded
+      setTimeout(() => {
+        initializeWeekByWeekSearch();
+      }, delay);
     }
     
     // Listen for page navigation (for SPA behavior)
@@ -35,19 +77,34 @@
   }
   
   /**
-   * Check if the current page is a Google search page
+   * Detect which site we're currently on
    */
-  function isGoogleSearchPage() {
-    return window.location.hostname.includes('google') && 
-           (window.location.pathname === '/search' || window.location.pathname === '/');
+  function detectSite() {
+    const hostname = window.location.hostname.toLowerCase();
+    
+    if (hostname.includes('google') && 
+        (window.location.pathname === '/search' || window.location.pathname === '/')) {
+      return 'google';
+    } 
+    else if (hostname.includes('youtube') || hostname.includes('youtu.be')) {
+      return 'youtube';
+    }
+    else if (hostname.includes('twitter') || hostname.includes('x.com')) {
+      return 'twitter';
+    }
+    
+    return null;
   }
   
   /**
    * Initialize the week by week search functionality
    */
   function initializeWeekByWeekSearch() {
-    // Create and inject the calendar icon
-    injectCalendarIcon();
+    // Reset attempt counter
+    initAttempts = 0;
+    
+    // Try to inject the calendar icon (with retry mechanism)
+    tryInjectCalendarIcon();
     
     // Create the date picker component (initially hidden)
     createDatePickerElement();
@@ -60,18 +117,50 @@
   }
   
   /**
-   * Create and inject the calendar icon into the Google search bar
+   * Try to inject the calendar icon with retry mechanism
    */
-  function injectCalendarIcon() {
+  function tryInjectCalendarIcon() {
     // Remove any existing calendar icon first
     removeExistingCalendarIcon();
     
-    // Find the search form - there are a few possible selectors to try
-    const searchForm = document.querySelector('form[role="search"], form#tsf, form.search-form');
+    if (!currentSite) return;
     
+    // Try to inject the calendar icon
+    const success = injectCalendarIcon();
+    
+    // If not successful and we haven't reached max retries, try again
+    if (!success && initAttempts < config.maxRetries) {
+      initAttempts++;
+      console.log(`Retry attempt ${initAttempts} for ${currentSite} in ${config.retryDelay}ms`);
+      setTimeout(tryInjectCalendarIcon, config.retryDelay);
+    }
+  }
+  
+  /**
+   * Create and inject the calendar icon into the site's search bar
+   * @returns {boolean} Whether injection was successful
+   */
+  function injectCalendarIcon() {
+    if (!currentSite) return false;
+    
+    // Get site-specific selectors
+    const siteConfig = config.sites[currentSite];
+    
+    // Find the search form using the site-specific selector
+    let searchForm = document.querySelector(siteConfig.searchFormSelector);
+    // if it is twitter, get the parent node of the input
+    if (currentSite === 'twitter') {
+      searchForm = searchForm ? searchForm.parentNode : null;
+    }
+    console.log(searchForm);
     if (!searchForm) {
-      console.error('Google Week by Week: Could not find the search form');
-      return;
+      console.error(`Week by Week: Could not find the search form on ${currentSite}`);
+      
+      // On YouTube, try again after a short delay as their search bar might load later
+      if (currentSite === 'youtube') {
+        setTimeout(injectCalendarIcon, 1500);
+      }
+      return false;
     }
     
     // Create the calendar icon element
@@ -81,11 +170,14 @@
     calendarIcon.innerHTML = createCalendarIconSVG();
     calendarIcon.title = 'Search by week';
     
-    // Add styles to the icon
+    // Get site-specific icon size if available
+    const iconSize = siteConfig.iconSize || config.calendarIconSize;
+
+    // Add styles to the icon, with some site-specific adjustments
     calendarIcon.style.cssText = `
       cursor: pointer;
-      width: ${config.calendarIconSize};
-      height: ${config.calendarIconSize};
+      width: ${iconSize};
+      height: ${iconSize};
       display: flex;
       align-items: center;
       justify-content: center;
@@ -95,30 +187,89 @@
       vertical-align: middle;
       position: relative;
       top: 6px;
+      z-index: 1000;
     `;
     
-    // Find the right spot to insert the icon
-    // Usually next to the search button or inside the search input container
-    const searchButton = searchForm.querySelector('button[type="submit"], button[aria-label="Google Search"]');
+    // Find the right spot to insert the icon based on the site
+    const searchButton = searchForm.querySelector(siteConfig.searchButtonSelector);
     
     if (searchButton && searchButton.parentNode) {
       searchButton.parentNode.insertBefore(calendarIcon, searchButton);
-      searchButton.parentNode.parentNode.style.alignItems = 'center'; // Align items in the search form
-      searchButton.parentNode.parentNode.style.verticalAlign = 'middle'; // Align items in the search form
+      
+      // Make some site-specific adjustments to positioning
+      if (currentSite === 'youtube') {
+        calendarIcon.style.marginRight = '8px';
+        
+        // Handle the ytSearchboxComponentInputBox class specifically
+        if (searchForm.id === 'container' || searchForm.classList.contains('ytSearchboxComponentInputBox')) {
+          calendarIcon.style.position = 'absolute';
+          calendarIcon.style.right = '60px';
+          calendarIcon.style.top = '50%';
+          calendarIcon.style.transform = 'translateY(-50%)';
+          
+          // Increase z-index to make sure it's above YouTube's elements
+          calendarIcon.style.zIndex = '2000';
+        }
+      } else if (currentSite === 'twitter') {
+        calendarIcon.style.position = 'absolute';
+        calendarIcon.style.right = '60px';
+        calendarIcon.style.top = '50%';
+        calendarIcon.style.transform = 'translateY(-50%)';
+      }
     } else {
       // Fallback to append to the form
       searchForm.appendChild(calendarIcon);
+      
+      // Special handling for YouTube's search box when the button isn't found
+      if (currentSite === 'youtube') {
+        calendarIcon.style.position = 'absolute';
+        calendarIcon.style.right = '50px';
+        calendarIcon.style.top = '50%';
+        calendarIcon.style.transform = 'translateY(-50%)';
+        calendarIcon.style.zIndex = '2000';
+      }
     }
     
-    console.log('Calendar icon injected');
+    // Special handling for Twitter
+    if (currentSite === 'twitter') {
+      // For Twitter, we want to position the icon adjacent to the search input
+      // First try to find the search input container
+      const searchContainer = searchForm.parentNode;
+      if (searchContainer) {
+        // Reset previous styling
+        calendarIcon.style.position = 'absolute';
+        calendarIcon.style.right = '45px';
+        calendarIcon.style.top = '50%';
+        calendarIcon.style.transform = 'translateY(-50%)';
+        calendarIcon.style.zIndex = '2000';
+        
+        // If searchForm is direct input, we need to work with its parent
+        searchContainer.style.position = 'relative';
+        
+        // Make sure the icon isn't hidden by any overflow properties
+        calendarIcon.style.pointerEvents = 'auto';
+        
+        if (calendarIcon.parentNode !== searchContainer) {
+          // Move the icon to be a child of the search container for better positioning
+          searchContainer.appendChild(calendarIcon);
+        }
+      }
+    }
+    
+    console.log(`Calendar icon injected on ${currentSite}`);
+    return true;
   }
   
   /**
    * Create the SVG for the calendar icon
    */
   function createCalendarIconSVG() {
+    // Get site-specific icon size if available
+    const iconSize = currentSite && config.sites[currentSite].iconSize ? 
+      config.sites[currentSite].iconSize : config.calendarIconSize;
+      
     return `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${config.calendarIconSize}" height="${config.calendarIconSize}" 
+      <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" 
         viewBox="0 0 24 24" fill="none" stroke="${config.calendarIconColor}" 
         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -140,6 +291,44 @@
   }
   
   /**
+   * Detect Twitter's theme (dark or light)
+   * @returns {string} 'dark' or 'light'
+   */
+  function detectTwitterTheme() {
+    // Check if we're on Twitter
+    if (currentSite !== 'twitter') {
+      return 'light'; // Default to light for non-Twitter sites
+    }
+    
+    // Method 1: Check for dark mode by looking at the background color
+    const bodyBgColor = window.getComputedStyle(document.body).backgroundColor;
+    
+    // Convert RGB to brightness
+    if (bodyBgColor) {
+      const rgb = bodyBgColor.match(/\d+/g);
+      if (rgb && rgb.length >= 3) {
+        // Calculate brightness (simple formula: (R+G+B)/3)
+        const brightness = (parseInt(rgb[0]) + parseInt(rgb[1]) + parseInt(rgb[2])) / 3;
+        if (brightness < 128) {
+          return 'dark';
+        }
+      }
+    }
+    
+    // Method 2: Look for dark theme indicators in classes or attributes
+    const darkThemeIndicator = document.documentElement.getAttribute('data-theme') === 'dark' ||
+                               document.body.classList.contains('dark') ||
+                               document.querySelector('[data-nightmode="true"]');
+                               
+    if (darkThemeIndicator) {
+      return 'dark';
+    }
+    
+    // Default to light theme if no dark indicators found
+    return 'light';
+  }
+
+  /**
    * Create the date picker element that will appear when clicking the calendar icon
    */
   function createDatePickerElement() {
@@ -151,50 +340,84 @@
     datePicker.id = 'gwbw-date-picker';
     datePicker.className = 'gwbw-date-picker';
     
+    // Get theme for Twitter
+    const twitterTheme = currentSite === 'twitter' ? detectTwitterTheme() : 'light';
+    const isTwitterDark = twitterTheme === 'dark';
+    
+    // Set colors based on theme
+    const bgColor = isTwitterDark && currentSite === 'twitter' ? '#000' : 'white';
+    const textColor = isTwitterDark && currentSite === 'twitter' ? '#e7e9ea' : '#202124';
+    const borderColor = isTwitterDark && currentSite === 'twitter' ? '#333' : '#dfe1e5';
+    const secondaryTextColor = isTwitterDark && currentSite === 'twitter' ? '#8899a6' : '#5f6368';
+    const buttonBgColor = isTwitterDark && currentSite === 'twitter' ? '#192734' : '#f8f9fa';
+    const buttonTextColor = isTwitterDark && currentSite === 'twitter' ? '#e7e9ea' : '#3c4043';
+    
+    // Set sizes for Twitter
+    const fontSize = currentSite === 'twitter' ? '13px' : '14px';
+    const inputHeight = currentSite === 'twitter' ? '32px' : '36px';
+    const buttonHeight = currentSite === 'twitter' ? '30px' : '36px';
+    const buttonPadding = currentSite === 'twitter' ? '6px 12px' : '8px 16px';
+    const datePadding = currentSite === 'twitter' ? '12px' : '16px';
+    
     // Add styles to the date picker
     datePicker.style.cssText = `
       position: absolute;
       z-index: 9999;
-      background: white;
+      background: ${bgColor};
       border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-      padding: 16px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, ${isTwitterDark ? '0.5' : '0.2'});
+      padding: ${datePadding};
       width: ${config.datePickerWidth};
       display: none;
       opacity: 0;
       transition: opacity ${config.animationDuration} ease-in-out;
-      font-family: Arial, sans-serif;
+      font-family: ${currentSite === 'twitter' ? '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' : 'Arial, sans-serif'};
+      font-size: ${fontSize};
+      color: ${textColor};
+      border: 1px solid ${borderColor};
     `;
+    
+    // Get site-specific accent color
+    const accentColor = currentSite ? config.sites[currentSite].activeIconColor : config.activeIconColor;
     
     // Create the content for the date picker
     datePicker.innerHTML = `
-      <div style="margin-bottom: 16px; font-weight: bold; color: #202124;">
-        Search by Week
+      <div style="margin-bottom: ${currentSite === 'twitter' ? '12px' : '16px'}; font-weight: bold; color: ${textColor};">
+        Search ${currentSite ? currentSite.charAt(0).toUpperCase() + currentSite.slice(1) : ''} by Week
       </div>
       
-      <div style="margin-bottom: 16px;">
-        <div style="margin-bottom: 8px; color: #5f6368;">Start Date</div>
-        <input type="date" id="gwbw-start-date" style="width: 100%; padding: 8px; border: 1px solid #dfe1e5; border-radius: 4px;">
+      <div style="margin-bottom: ${currentSite === 'twitter' ? '12px' : '16px'};">
+        <div style="margin-bottom: 6px; color: ${secondaryTextColor}; font-size: ${fontSize};">Start Date</div>
+        <input type="date" id="gwbw-start-date" style="width: 100%; padding: ${currentSite === 'twitter' ? '6px' : '8px'}; 
+          height: ${inputHeight}; border: 1px solid ${borderColor}; border-radius: 4px; background: ${bgColor}; color: ${textColor};">
       </div>
       
-      <div style="margin-bottom: 16px;">
-        <div style="margin-bottom: 8px; color: #5f6368;">End Date</div>
-        <input type="date" id="gwbw-end-date" style="width: 100%; padding: 8px; border: 1px solid #dfe1e5; border-radius: 4px;">
+      <div style="margin-bottom: ${currentSite === 'twitter' ? '12px' : '16px'};">
+        <div style="margin-bottom: 6px; color: ${secondaryTextColor}; font-size: ${fontSize};">End Date</div>
+        <input type="date" id="gwbw-end-date" style="width: 100%; padding: ${currentSite === 'twitter' ? '6px' : '8px'}; 
+          height: ${inputHeight}; border: 1px solid ${borderColor}; border-radius: 4px; background: ${bgColor}; color: ${textColor};">
       </div>
       
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div style="display: flex; align-items: center;">
-          <button id="gwbw-prev-week" style="background: #f8f9fa; border: 1px solid #dadce0; border-radius: 4px 0 0 4px; padding: 8px; color: #3c4043; cursor: pointer; margin: 0; display: flex; align-items: center; justify-content: center; height: 36px;">
+          <button id="gwbw-prev-week" style="background: ${buttonBgColor}; border: 1px solid ${borderColor}; 
+            border-radius: 4px 0 0 4px; padding: 6px; color: ${buttonTextColor}; cursor: pointer; margin: 0; 
+            display: flex; align-items: center; justify-content: center; height: ${buttonHeight};">
             ${createArrowSVG('left')}
           </button>
-          <button id="gwbw-quick-week" style="background: #f8f9fa; border: 1px solid #dadce0; border-left: none; border-right: none; padding: 8px 16px; color: #3c4043; cursor: pointer; margin: 0; height: 36px;">
+          <button id="gwbw-quick-week" style="background: ${buttonBgColor}; border: 1px solid ${borderColor}; 
+            border-left: none; border-right: none; padding: ${buttonPadding}; 
+            color: ${buttonTextColor}; cursor: pointer; margin: 0; height: ${buttonHeight}; font-size: ${fontSize};">
             Current Week
           </button>
-          <button id="gwbw-next-week" style="background: #f8f9fa; border: 1px solid #dadce0; border-radius: 0 4px 4px 0; padding: 8px; color: #3c4043; cursor: pointer; margin: 0; display: flex; align-items: center; justify-content: center; height: 36px;">
+          <button id="gwbw-next-week" style="background: ${buttonBgColor}; border: 1px solid ${borderColor}; 
+            border-radius: 0 4px 4px 0; padding: 6px; color: ${buttonTextColor}; cursor: pointer; margin: 0; 
+            display: flex; align-items: center; justify-content: center; height: ${buttonHeight};">
             ${createArrowSVG('right')}
           </button>
         </div>
-        <button id="gwbw-apply" style="background: #1a73e8; border: none; border-radius: 4px; padding: 8px 16px; color: white; cursor: pointer;">Apply</button>
+        <button id="gwbw-apply" style="background: ${accentColor}; border: none; border-radius: 4px; 
+          padding: ${buttonPadding}; color: white; cursor: pointer; height: ${buttonHeight}; font-size: ${fontSize};">Apply</button>
       </div>
     `;
     
@@ -275,14 +498,19 @@
     const calendarIcon = document.getElementById('gwbw-calendar-icon');
     if (!calendarIcon) return;
     
+    // Get site-specific accent color
+    const accentColor = currentSite ? 
+      config.sites[currentSite].activeIconColor : config.activeIconColor;
+      
     // Update the SVG color based on active state
     const svg = calendarIcon.querySelector('svg');
     if (svg) {
-      svg.setAttribute('stroke', isActive ? config.activeIconColor : config.calendarIconColor);
+      svg.setAttribute('stroke', isActive ? accentColor : config.calendarIconColor);
     }
     
-    // Update the background color
-    calendarIcon.style.backgroundColor = isActive ? 'rgba(26, 115, 232, 0.1)' : '';
+    // Update the background color with site-specific transparency
+    calendarIcon.style.backgroundColor = isActive ? 
+      `${accentColor}33` : ''; // 33 is 20% opacity in hex
   }
   
   /**
@@ -290,41 +518,75 @@
    */
   function checkForExistingDateParams() {
     const urlParams = new URLSearchParams(window.location.search);
-    const tbs = urlParams.get('tbs');
     
-    if (tbs) {
-      // Parse the tbs parameter to extract date ranges
-      // The format is usually "cdr:1,cd_min:MM/DD/YYYY,cd_max:MM/DD/YYYY"
-      const match = tbs.match(/cd_min:(\d+)\/(\d+)\/(\d+),cd_max:(\d+)\/(\d+)\/(\d+)/);
+    // Different sites use different URL parameter formats
+    if (currentSite === 'google') {
+      const tbs = urlParams.get('tbs');
       
-      if (match) {
-        // Convert MM/DD/YYYY to YYYY-MM-DD for input[type=date]
-        const startMonth = match[1].padStart(2, '0');
-        const startDay = match[2].padStart(2, '0');
-        const startYear = match[3];
+      if (tbs) {
+        // Parse the tbs parameter to extract date ranges
+        // Format is usually "cdr:1,cd_min:MM/DD/YYYY,cd_max:MM/DD/YYYY"
+        const match = tbs.match(/cd_min:(\d+)\/(\d+)\/(\d+),cd_max:(\d+)\/(\d+)\/(\d+)/);
         
-        const endMonth = match[4].padStart(2, '0');
-        const endDay = match[5].padStart(2, '0');
-        const endYear = match[6];
-        
-        selectedStartDate = `${startYear}-${startMonth}-${startDay}`;
-        selectedEndDate = `${endYear}-${endMonth}-${endDay}`;
-        
-        // Update the input fields when they become available
-        setTimeout(() => {
-          const startDateInput = document.getElementById('gwbw-start-date');
-          const endDateInput = document.getElementById('gwbw-end-date');
+        if (match) {
+          // Convert MM/DD/YYYY to YYYY-MM-DD for input[type=date]
+          const startMonth = match[1].padStart(2, '0');
+          const startDay = match[2].padStart(2, '0');
+          const startYear = match[3];
           
-          if (startDateInput) startDateInput.value = selectedStartDate;
-          if (endDateInput) endDateInput.value = selectedEndDate;
-        }, 100);
-        
-        // Visual indicator that date filter is active
-        updateCalendarIconState(true);
+          const endMonth = match[4].padStart(2, '0');
+          const endDay = match[5].padStart(2, '0');
+          const endYear = match[6];
+          
+          selectedStartDate = `${startYear}-${startMonth}-${startDay}`;
+          selectedEndDate = `${endYear}-${endMonth}-${endDay}`;
+          
+          updateDateInputsWithDelay();
+        }
       }
+    } else if (currentSite === 'youtube') {
+      const sp = urlParams.get('sp');
+      
+      // YouTube uses a parameter like sp=CAISBggCEAEYAQ%3D%3D for date filtering
+      // Since this is encoded, we need to check if filter is active by looking at the UI
+      const dateFilterActive = document.querySelector('ytd-search-filter-renderer yt-formatted-string:contains("Last hour"), ytd-search-filter-renderer yt-formatted-string:contains("Today")');
+      
+      if (dateFilterActive || (sp && sp.includes('CAI'))) {
+        // Extract dates from UI or use current week if filter is active but we can't determine dates
+        setCurrentWeek();
+      }
+    } else if (currentSite === 'twitter') {
+      const since = urlParams.get('since');
+      const until = urlParams.get('until');
+      
+      if (since && until) {
+        // Twitter uses since:YYYY-MM-DD until:YYYY-MM-DD format
+        selectedStartDate = since;
+        selectedEndDate = until;
+        
+        updateDateInputsWithDelay();
+      }
+    }
+    
+    // Visual indicator that date filter is active
+    if (selectedStartDate && selectedEndDate) {
+      updateCalendarIconState(true);
     }
   }
   
+  /**
+   * Update date input fields with a delay to ensure they're in the DOM
+   */
+  function updateDateInputsWithDelay() {
+    setTimeout(() => {
+      const startDateInput = document.getElementById('gwbw-start-date');
+      const endDateInput = document.getElementById('gwbw-end-date');
+      
+      if (startDateInput) startDateInput.value = selectedStartDate;
+      if (endDateInput) endDateInput.value = selectedEndDate;
+    }, 100);
+  }
+
   /**
    * Add event listeners for the calendar icon and date picker
    */
@@ -505,7 +767,7 @@
   }
   
   /**
-   * Apply the date filter by modifying the search URL
+   * Apply the date filter by modifying the search URL based on the current site
    */
   function applyDateFilter() {
     if (!selectedStartDate || !selectedEndDate) {
@@ -517,13 +779,50 @@
     const url = new URL(window.location.href);
     const urlParams = new URLSearchParams(url.search);
     
-    // Format dates for Google's URL parameters
-    const startDateFormatted = formatDateForGoogle(selectedStartDate);
-    const endDateFormatted = formatDateForGoogle(selectedEndDate);
+    // Format dates for URL parameters (depends on site)
+    const startDateFormatted = formatDateForSite(selectedStartDate);
+    const endDateFormatted = formatDateForSite(selectedEndDate);
     
-    // Set the tbs parameter for date range
-    // Format: cdr:1,cd_min:MM/DD/YYYY,cd_max:MM/DD/YYYY
-    urlParams.set('tbs', `cdr:1,cd_min:${startDateFormatted},cd_max:${endDateFormatted}`);
+    if (currentSite === 'google') {
+      // Google format: cdr:1,cd_min:MM/DD/YYYY,cd_max:MM/DD/YYYY
+      urlParams.set('tbs', `cdr:1,cd_min:${startDateFormatted},cd_max:${endDateFormatted}`);
+    } 
+    else if (currentSite === 'youtube') {
+      // YouTube uses a complex parameter format that's difficult to reproduce
+      // We'll use their search tools directly by adding the query parameter
+      const searchQuery = urlParams.get('search_query') || '';
+      
+      // Convert dates to YYYY-MM-DD format for YouTube
+      const formattedStartDate = formatDateStandardized(selectedStartDate);
+      const formattedEndDate = formatDateStandardized(selectedEndDate);
+      
+      // Add date filter to search query if not already present
+      if (!searchQuery.includes('after:') && !searchQuery.includes('before:')) {
+        urlParams.set('search_query', `${searchQuery} after:${formattedStartDate} before:${formattedEndDate}`.trim());
+      }
+      
+      // Clear any existing filter params that might interfere
+      if (urlParams.has('sp')) {
+        urlParams.delete('sp');
+      }
+    } 
+    else if (currentSite === 'twitter') {
+      // Twitter format: since:YYYY-MM-DD until:YYYY-MM-DD
+      // These are typically part of the q parameter
+      const query = urlParams.get('q') || '';
+      
+      // Convert dates to YYYY-MM-DD format
+      const formattedStartDate = formatDateStandardized(selectedStartDate);
+      const formattedEndDate = formatDateStandardized(selectedEndDate);
+      
+      // Remove any existing date filters
+      let newQuery = query.replace(/\s*(since|until):\d{4}-\d{2}-\d{2}/g, '').trim();
+      
+      // Add the new date filters
+      newQuery = `${newQuery} since:${formattedStartDate} until:${formattedEndDate}`.trim();
+      
+      urlParams.set('q', newQuery);
+    }
     
     // Update the URL with the new parameters
     url.search = urlParams.toString();
@@ -533,8 +832,40 @@
   }
   
   /**
+   * Format a date according to the current site's requirements
+   */
+  function formatDateForSite(dateStr) {
+    if (currentSite === 'google') {
+      // Google format: MM/DD/YYYY
+      const date = new Date(dateStr);
+      const month = (date.getMonth() + 1).toString();
+      const day = date.getDate().toString();
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
+    } 
+    else if (currentSite === 'youtube' || currentSite === 'twitter') {
+      // YouTube and Twitter use YYYY-MM-DD
+      return formatDateStandardized(dateStr);
+    }
+    
+    // Default format
+    return dateStr;
+  }
+  
+  /**
+   * Format a date string as YYYY-MM-DD
+   */
+  function formatDateStandardized(dateStr) {
+    const date = new Date(dateStr);
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
    * Observe URL changes to re-initialize the extension when navigating
-   * between Google Search pages (handles AJAX navigation)
+   * between supported pages (handles SPA navigation)
    */
   function observeUrlChanges() {
     let lastUrl = location.href;
@@ -543,8 +874,10 @@
     const observer = new MutationObserver(function() {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
-        if (isGoogleSearchPage()) {
-          console.log('URL changed to a Google search page, reinitializing');
+        currentSite = detectSite();
+        
+        if (currentSite) {
+          console.log(`URL changed to a ${currentSite} page, reinitializing`);
           setTimeout(initializeWeekByWeekSearch, 500);
         }
       }
@@ -555,7 +888,8 @@
     
     // Also listen for popstate events for browser back/forward
     window.addEventListener('popstate', function() {
-      if (isGoogleSearchPage()) {
+      currentSite = detectSite();
+      if (currentSite) {
         setTimeout(initializeWeekByWeekSearch, 500);
       }
     });

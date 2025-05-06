@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Google Week by Week",
+  "name": "Week by Week Search",
   "version": "0.1.0",
-  "description": "Search Google results week by week with a convenient date range picker",
+  "description": "Search Google, YouTube, and Twitter results week by week with a convenient date range picker",
   "icons": {
     "16": "icons/favicon-16x16.png",
     "32": "icons/favicon-32x32.png",
@@ -10,14 +10,20 @@
     "128": "icons/favicon-128x128.png"
   },
   "action": {
-    "default_title": "Google Week by Week"
+    "default_title": "Week by Week Search"
   },
   "permissions": [],
   "content_scripts": [
     {
       "matches": [
         "https://www.google.com/*",
-        "https://google.com/*"
+        "https://google.com/*",
+        "https://www.youtube.com/*",
+        "https://youtube.com/*",
+        "https://twitter.com/*",
+        "https://www.twitter.com/*",
+        "https://x.com/*",
+        "https://www.x.com/*"
       ],
       "run_at": "document_idle",
       "js": [
