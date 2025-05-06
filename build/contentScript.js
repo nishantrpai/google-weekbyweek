@@ -31,13 +31,8 @@ var __webpack_exports__ = {};
         activeIconColor: '#1a73e8', // Google blue
         searchFormSelector: 'form[role="search"], form#tsf, form.search-form',
         searchButtonSelector: 'button[type="submit"], button[aria-label="Google Search"]',
-        urlParam: 'tbs'
-      },
-      youtube: {
-        activeIconColor: '#f00', // YouTube red
-        searchFormSelector: 'form#search-form, ytd-searchbox[role="search"], #container.ytSearchboxComponentInputBox',
-        searchButtonSelector: 'button#search-icon-legacy, yt-icon-button.ytd-searchbox, button.ytSearchboxComponentButton',
-        urlParam: 'sp'
+        urlParam: 'tbs',
+        iconSize: '20px' // Default icon size for Google
       },
       twitter: {
         activeIconColor: '#1DA1F2', // Twitter blue
@@ -91,9 +86,6 @@ var __webpack_exports__ = {};
         (window.location.pathname === '/search' || window.location.pathname === '/')) {
       return 'google';
     } 
-    else if (hostname.includes('youtube') || hostname.includes('youtu.be')) {
-      return 'youtube';
-    }
     else if (hostname.includes('twitter') || hostname.includes('x.com')) {
       return 'twitter';
     }
@@ -153,18 +145,15 @@ var __webpack_exports__ = {};
     
     // Find the search form using the site-specific selector
     let searchForm = document.querySelector(siteConfig.searchFormSelector);
-    // if it is twitter, get the parent node of the input
+    
+    // Special handling for different sites
     if (currentSite === 'twitter') {
       searchForm = searchForm ? searchForm.parentNode : null;
     }
+    
     console.log(searchForm);
     if (!searchForm) {
       console.error(`Week by Week: Could not find the search form on ${currentSite}`);
-      
-      // On YouTube, try again after a short delay as their search bar might load later
-      if (currentSite === 'youtube') {
-        setTimeout(injectCalendarIcon, 1500);
-      }
       return false;
     }
     
@@ -182,7 +171,6 @@ var __webpack_exports__ = {};
     calendarIcon.style.cssText = `
       cursor: pointer;
       width: ${iconSize};
-      height: ${iconSize};
       display: flex;
       align-items: center;
       justify-content: center;
@@ -191,55 +179,21 @@ var __webpack_exports__ = {};
       transition: background-color 0.2s;
       vertical-align: middle;
       position: relative;
-      top: 6px;
       z-index: 1000;
+      pointer-events: auto;
     `;
     
     // Find the right spot to insert the icon based on the site
-    const searchButton = searchForm.querySelector(siteConfig.searchButtonSelector);
+    let searchButton = null;
     
-    if (searchButton && searchButton.parentNode) {
-      searchButton.parentNode.insertBefore(calendarIcon, searchButton);
-      
-      // Make some site-specific adjustments to positioning
-      if (currentSite === 'youtube') {
-        calendarIcon.style.marginRight = '8px';
-        
-        // Handle the ytSearchboxComponentInputBox class specifically
-        if (searchForm.id === 'container' || searchForm.classList.contains('ytSearchboxComponentInputBox')) {
-          calendarIcon.style.position = 'absolute';
-          calendarIcon.style.right = '60px';
-          calendarIcon.style.top = '50%';
-          calendarIcon.style.transform = 'translateY(-50%)';
-          
-          // Increase z-index to make sure it's above YouTube's elements
-          calendarIcon.style.zIndex = '2000';
-        }
-      } else if (currentSite === 'twitter') {
-        calendarIcon.style.position = 'absolute';
-        calendarIcon.style.right = '60px';
-        calendarIcon.style.top = '50%';
-        calendarIcon.style.transform = 'translateY(-50%)';
-      }
-    } else {
-      // Fallback to append to the form
-      searchForm.appendChild(calendarIcon);
-      
-      // Special handling for YouTube's search box when the button isn't found
-      if (currentSite === 'youtube') {
-        calendarIcon.style.position = 'absolute';
-        calendarIcon.style.right = '50px';
-        calendarIcon.style.top = '50%';
-        calendarIcon.style.transform = 'translateY(-50%)';
-        calendarIcon.style.zIndex = '2000';
-      }
+    if (searchForm) {
+      searchButton = searchForm.querySelector(siteConfig.searchButtonSelector);
     }
     
-    // Special handling for Twitter
     if (currentSite === 'twitter') {
-      // For Twitter, we want to position the icon adjacent to the search input
+      // For Twitter, position icon adjacent to the search input
       // First try to find the search input container
-      const searchContainer = searchForm.parentNode;
+      const searchContainer = searchForm ? searchForm.parentNode : null;
       if (searchContainer) {
         // Reset previous styling
         calendarIcon.style.position = 'absolute';
@@ -251,13 +205,18 @@ var __webpack_exports__ = {};
         // If searchForm is direct input, we need to work with its parent
         searchContainer.style.position = 'relative';
         
-        // Make sure the icon isn't hidden by any overflow properties
-        calendarIcon.style.pointerEvents = 'auto';
-        
         if (calendarIcon.parentNode !== searchContainer) {
           // Move the icon to be a child of the search container for better positioning
           searchContainer.appendChild(calendarIcon);
         }
+      }
+    } else {
+      // Standard positioning for Google and other sites
+      if (searchButton && searchButton.parentNode) {
+        searchButton.parentNode.insertBefore(calendarIcon, searchButton);
+      } else if (searchForm) {
+        // Fallback to append to the form
+        searchForm.appendChild(calendarIcon);
       }
     }
     
@@ -513,9 +472,6 @@ var __webpack_exports__ = {};
       svg.setAttribute('stroke', isActive ? accentColor : config.calendarIconColor);
     }
     
-    // Update the background color with site-specific transparency
-    calendarIcon.style.backgroundColor = isActive ? 
-      `${accentColor}33` : ''; // 33 is 20% opacity in hex
   }
   
   /**
