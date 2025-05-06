@@ -1,138 +1,570 @@
-// Content script file will run in the context of web page.
-// With content script you can manipulate the web pages using
-// Document Object Model (DOM).
-// You can also pass information to the parent extension.
+// Google Week by Week Search Extension
+// Adds functionality to search Google results one week at a time
 
-// We execute this script by making an entry in manifest.json file
-// under `content_scripts` property
-
-// For more information on Content Scripts,// See https://developer.chrome.com/extensions/content_scripts
-
-// Log `title` of current active web page
-// @ts-ignore
-let windowurl = window.location.href;
-let isProcessing = false;
-
-let validTLDs = [
-  "AAA", "AARP", "ABB", "ABBOTT", "ABBVIE", "ABC", "ABLE", "ABOGADO", "ABUDHABI", "AC", "ACADEMY", "ACCENTURE", "ACCOUNTANT", "ACCOUNTANTS", "ACO", "ACTOR", "AD", "ADS", "ADULT", "AE", "AEG", "AERO", "AETNA", "AF", "AFL", "AFRICA", "AG", "AGAKHAN", "AGENCY", "AI", "AIG", "AIRBUS", "AIRFORCE", "AIRTEL", "AKDN", "AL", "ALIBABA", "ALIPAY", "ALLFINANZ", "ALLSTATE", "ALLY", "ALSACE", "ALSTOM", "AM", "AMAZON", "AMERICANEXPRESS", "AMERICANFAMILY", "AMEX", "AMFAM", "AMICA", "AMSTERDAM", "ANALYTICS", "ANDROID", "ANQUAN", "ANZ", "AO", "AOL", "APARTMENTS", "APP", "APPLE", "AQ", "AQUARELLE", "AR", "ARAB", "ARAMCO", "ARCHI", "ARMY", "ARPA", "ART", "ARTE", "AS", "ASDA", "ASIA", "ASSOCIATES", "AT", "ATHLETA", "ATTORNEY", "AU", "AUCTION", "AUDI", "AUDIBLE", "AUDIO", "AUSPOST", "AUTHOR", "AUTO", "AUTOS", "AW", "AWS", "AX", "AXA", "AZ", "AZURE", "BA", "BABY", "BAIDU", "BANAMEX", "BAND", "BANK", "BAR", "BARCELONA", "BARCLAYCARD", "BARCLAYS", "BAREFOOT", "BARGAINS", "BASEBALL", "BASKETBALL", "BAUHAUS", "BAYERN", "BB", "BBC", "BBT", "BBVA", "BCG", "BCN", "BD", "BE", "BEATS", "BEAUTY", "BEER", "BENTLEY", "BERLIN", "BEST", "BESTBUY", "BET", "BF", "BG", "BH", "BHARTI", "BI", "BIBLE", "BID", "BIKE", "BING", "BINGO", "BIO", "BIZ", "BJ", "BLACK", "BLACKFRIDAY", "BLOCKBUSTER", "BLOG", "BLOOMBERG", "BLUE", "BM", "BMS", "BMW", "BN", "BNPPARIBAS", "BO", "BOATS", "BOEHRINGER", "BOFA", "BOM", "BOND", "BOO", "BOOK", "BOOKING", "BOSCH", "BOSTIK", "BOSTON", "BOT", "BOUTIQUE", "BOX", "BR", "BRADESCO", "BRIDGESTONE", "BROADWAY", "BROKER", "BROTHER", "BRUSSELS", "BS", "BT", "BUILD", "BUILDERS", "BUSINESS", "BUY", "BUZZ", "BV", "BW", "BY", "BZ", "BZH", "CA", "CAB", "CAFE", "CAL", "CALL", "CALVINKLEIN", "CAM", "CAMERA", "CAMP", "CANON", "CAPETOWN", "CAPITAL", "CAPITALONE", "CAR", "CARAVAN", "CARDS", "CARE", "CAREER", "CAREERS", "CARS", "CASA", "CASE", "CASH", "CASINO", "CAT", "CATERING", "CATHOLIC", "CBA", "CBN", "CBRE", "CC", "CD", "CENTER", "CEO", "CERN", "CF", "CFA", "CFD", "CG", "CH", "CHANEL", "CHANNEL", "CHARITY", "CHASE", "CHAT", "CHEAP", "CHINTAI", "CHRISTMAS", "CHROME", "CHURCH", "CI", "CIPRIANI", "CIRCLE", "CISCO", "CITADEL", "CITI", "CITIC", "CITY", "CK", "CL", "CLAIMS", "CLEANING", "CLICK", "CLINIC", "CLINIQUE", "CLOTHING", "CLOUD", "CLUB", "CLUBMED", "CM", "CN", "CO", "COACH", "CODES", "COFFEE", "COLLEGE", "COLOGNE", "COM", "COMMBANK", "COMMUNITY", "COMPANY", "COMPARE", "COMPUTER", "COMSEC", "CONDOS", "CONSTRUCTION", "CONSULTING", "CONTACT", "CONTRACTORS", "COOKING", "COOL", "COOP", "CORSICA", "COUNTRY", "COUPON", "COUPONS", "COURSES", "CPA", "CR", "CREDIT", "CREDITCARD", "CREDITUNION", "CRICKET", "CROWN", "CRS", "CRUISE", "CRUISES", "CU", "CUISINELLA", "CV", "CW", "CX", "CY", "CYMRU", "CYOU", "CZ", "DAD", "DANCE", "DATA", "DATE", "DATING", "DATSUN", "DAY", "DCLK", "DDS", "DE", "DEAL", "DEALER", "DEALS", "DEGREE", "DELIVERY", "DELL", "DELOITTE", "DELTA", "DEMOCRAT", "DENTAL", "DENTIST", "DESI", "DESIGN", "DEV", "DHL", "DIAMONDS", "DIET", "DIGITAL", "DIRECT", "DIRECTORY", "DISCOUNT", "DISCOVER", "DISH", "DIY", "DJ", "DK", "DM", "DNP", "DO", "DOCS", "DOCTOR", "DOG", "DOMAINS", "DOT", "DOWNLOAD", "DRIVE", "DTV", "DUBAI", "DUNLOP", "DUPONT", "DURBAN", "DVAG", "DVR", "DZ", "EARTH", "EAT", "EC", "ECO", "EDEKA", "EDU", "EDUCATION", "EE", "EG", "EMAIL", "EMERCK", "ENERGY", "ENGINEER", "ENGINEERING", "ENTERPRISES", "EPSON", "EQUIPMENT", "ER", "ERICSSON", "ERNI", "ES", "ESQ", "ESTATE", "ET", "EU", "EUROVISION", "EUS", "EVENTS", "EXCHANGE", "EXPERT", "EXPOSED", "EXPRESS", "EXTRASPACE", "FAGE", "FAIL", "FAIRWINDS", "FAITH", "FAMILY", "FAN", "FANS", "FARM", "FARMERS", "FASHION", "FAST", "FEDEX", "FEEDBACK", "FERRARI", "FERRERO", "FI", "FIDELITY", "FIDO", "FILM", "FINAL", "FINANCE", "FINANCIAL", "FIRE", "FIRESTONE", "FIRMDALE", "FISH", "FISHING", "FIT", "FITNESS", "FJ", "FK", "FLICKR", "FLIGHTS", "FLIR", "FLORIST", "FLOWERS", "FLY", "FM", "FO", "FOO", "FOOD", "FOOTBALL", "FORD", "FOREX", "FORSALE", "FORUM", "FOUNDATION", "FOX", "FR", "FREE", "FRESENIUS", "FRL", "FROGANS", "FRONTIER", "FTR", "FUJITSU", "FUN", "FUND", "FURNITURE", "FUTBOL", "FYI", "GA", "GAL", "GALLERY", "GALLO", "GALLUP", "GAME", "GAMES", "GAP", "GARDEN", "GAY", "GB", "GBIZ", "GD", "GDN", "GE", "GEA", "GENT", "GENTING", "GEORGE", "GF", "GG", "GGEE", "GH", "GI", "GIFT", "GIFTS", "GIVES", "GIVING", "GL", "GLASS", "GLE", "GLOBAL", "GLOBO", "GM", "GMAIL", "GMBH", "GMO", "GMX", "GN", "GODADDY", "GOLD", "GOLDPOINT", "GOLF", "GOO", "GOODYEAR", "GOOG", "GOOGLE", "GOP", "GOT", "GOV", "GP", "GQ", "GR", "GRAINGER", "GRAPHICS", "GRATIS", "GREEN", "GRIPE", "GROCERY", "GROUP", "GS", "GT", "GU", "GUCCI", "GUGE", "GUIDE", "GUITARS", "GURU", "GW", "GY", "HAIR", "HAMBURG", "HANGOUT", "HAUS", "HBO", "HDFC", "HDFCBANK", "HEALTH", "HEALTHCARE", "HELP", "HELSINKI", "HERE", "HERMES", "HIPHOP", "HISAMITSU", "HITACHI", "HIV", "HK", "HKT", "HM", "HN", "HOCKEY", "HOLDINGS", "HOLIDAY", "HOMEDEPOT", "HOMEGOODS", "HOMES", "HOMESENSE", "HONDA", "HORSE", "HOSPITAL", "HOST", "HOSTING", "HOT", "HOTELS", "HOTMAIL", "HOUSE", "HOW", "HR", "HSBC", "HT", "HU", "HUGHES", "HYATT", "HYUNDAI", "IBM", "ICBC", "ICE", "ICU", "ID", "IE", "IEEE", "IFM", "IKANO", "IL", "IM", "IMAMAT", "IMDB", "IMMO", "IMMOBILIEN", "IN", "INC", "INDUSTRIES", "INFINITI", "INFO", "ING", "INK", "INSTITUTE", "INSURANCE", "INSURE", "INT", "INTERNATIONAL", "INTUIT", "INVESTMENTS", "IO", "IPIRANGA", "IQ", "IR", "IRISH", "IS", "ISMAILI", "IST", "ISTANBUL", "IT", "ITAU", "ITV", "JAGUAR", "JAVA", "JCB", "JE", "JEEP", "JETZT", "JEWELRY", "JIO", "JLL", "JM", "JMP", "JNJ", "JO", "JOBS", "JOBURG", "JOT", "JOY", "JP", "JPMORGAN", "JPRS", "JUEGOS", "JUNIPER", "KAUFEN", "KDDI", "KE", "KERRYHOTELS", "KERRYLOGISTICS", "KERRYPROPERTIES", "KFH", "KG", "KH", "KI", "KIA", "KIDS", "KIM", "KINDLE", "KITCHEN", "KIWI", "KM", "KN", "KOELN", "KOMATSU", "KOSHER", "KP", "KPMG", "KPN", "KR", "KRD", "KRED", "KUOKGROUP", "KW", "KY", "KYOTO", "KZ", "LA", "LACAIXA", "LAMBORGHINI", "LAMER", "LANCASTER", "LAND", "LANDROVER", "LANXESS", "LASALLE", "LAT", "LATINO", "LATROBE", "LAW", "LAWYER", "LB", "LC", "LDS", "LEASE", "LECLERC", "LEFRAK", "LEGAL", "LEGO", "LEXUS", "LGBT", "LI", "LIDL", "LIFE", "LIFEINSURANCE", "LIFESTYLE", "LIGHTING", "LIKE", "LILLY", "LIMITED", "LIMO", "LINCOLN", "LINK", "LIPSY", "LIVE", "LIVING", "LK", "LLC", "LLP", "LOAN", "LOANS", "LOCKER", "LOCUS", "LOL", "LONDON", "LOTTE", "LOTTO", "LOVE", "LPL", "LPLFINANCIAL", "LR", "LS", "LT", "LTD", "LTDA", "LU", "LUNDBECK", "LUXE", "LUXURY", "LV", "LY", "MA", "MADRID", "MAIF", "MAISON", "MAKEUP", "MAN", "MANAGEMENT", "MANGO", "MAP", "MARKET", "MARKETING", "MARKETS", "MARRIOTT", "MARSHALLS", "MATTEL", "MBA", "MC", "MCKINSEY", "MD", "ME", "MED", "MEDIA", "MEET", "MELBOURNE", "MEME", "MEMORIAL", "MEN", "MENU", "MERCKMSD", "MG", "MH", "MIAMI", "MICROSOFT", "MIL", "MINI", "MINT", "MIT", "MITSUBISHI", "MK", "ML", "MLB", "MLS", "MM", "MMA", "MN", "MO", "MOBI", "MOBILE", "MODA", "MOE", "MOI", "MOM", "MONASH", "MONEY", "MONSTER", "MORMON", "MORTGAGE", "MOSCOW", "MOTO", "MOTORCYCLES", "MOV", "MOVIE", "MP", "MQ", "MR", "MS", "MSD", "MT", "MTN", "MTR", "MU", "MUSEUM", "MUSIC", "MV", "MW", "MX", "MY", "MZ", "NA", "NAB", "NAGOYA", "NAME", "NAVY", "NBA", "NC", "NE", "NEC", "NET", "NETBANK", "NETFLIX", "NETWORK", "NEUSTAR", "NEW", "NEWS", "NEXT", "NEXTDIRECT", "NEXUS", "NF", "NFL", "NG", "NGO", "NHK", "NI", "NICO", "NIKE", "NIKON", "NINJA", "NISSAN", "NISSAY", "NL", "NO", "NOKIA", "NORTON", "NOW", "NOWRUZ", "NOWTV", "NP", "NR", "NRA", "NRW", "NTT", "NU", "NYC", "NZ", "OBI", "OBSERVER", "OFFICE", "OKINAWA", "OLAYAN", "OLAYANGROUP", "OLLO", "OM", "OMEGA", "ONE", "ONG", "ONL", "ONLINE", "OOO", "OPEN", "ORACLE", "ORANGE", "ORG", "ORGANIC", "ORIGINS", "OSAKA", "OTSUKA", "OTT", "OVH", "PA", "PAGE", "PANASONIC", "PARIS", "PARS", "PARTNERS", "PARTS", "PARTY", "PAY", "PCCW", "PE", "PET", "PF", "PFIZER", "PG", "PH", "PHARMACY", "PHD", "PHILIPS", "PHONE", "PHOTO", "PHOTOGRAPHY", "PHOTOS", "PHYSIO", "PICS", "PICTET", "PICTURES", "PID", "PIN", "PING", "PINK", "PIONEER", "PIZZA", "PK", "PL", "PLACE", "PLAY", "PLAYSTATION", "PLUMBING", "PLUS", "PM", "PN", "PNC", "POHL", "POKER", "POLITIE", "PORN", "POST", "PR", "PRAMERICA", "PRAXI", "PRESS", "PRIME", "PRO", "PROD", "PRODUCTIONS", "PROF", "PROGRESSIVE", "PROMO", "PROPERTIES", "PROPERTY", "PROTECTION", "PRU", "PRUDENTIAL", "PS", "PT", "PUB", "PW", "PWC", "PY", "QA", "QPON", "QUEBEC", "QUEST", "RACING", "RADIO", "RE", "READ", "REALESTATE", "REALTOR", "REALTY", "RECIPES", "RED", "REDSTONE", "REDUMBRELLA", "REHAB", "REISE", "REISEN", "REIT", "RELIANCE", "REN", "RENT", "RENTALS", "REPAIR", "REPORT", "REPUBLICAN", "REST", "RESTAURANT", "REVIEW", "REVIEWS", "REXROTH", "RICH", "RICHARDLI", "RICOH", "RIL", "RIO", "RIP", "RO", "ROCKS", "RODEO", "ROGERS", "ROOM", "RS", "RSVP", "RU", "RUGBY", "RUHR", "RUN", "RW", "RWE", "RYUKYU", "SA", "SAARLAND", "SAFE", "SAFETY", "SAKURA", "SALE", "SALON", "SAMSCLUB", "SAMSUNG", "SANDVIK", "SANDVIKCOROMANT", "SANOFI", "SAP", "SARL", "SAS", "SAVE", "SAXO", "SB", "SBI", "SBS", "SC", "SCB", "SCHAEFFLER", "SCHMIDT", "SCHOLARSHIPS", "SCHOOL", "SCHULE", "SCHWARZ", "SCIENCE", "SCOT", "SD", "SE", "SEARCH", "SEAT", "SECURE", "SECURITY", "SEEK", "SELECT", "SENER", "SERVICES", "SEVEN", "SEW", "SEX", "SEXY", "SFR", "SG", "SH", "SHANGRILA", "SHARP", "SHELL", "SHIA", "SHIKSHA", "SHOES", "SHOP", "SHOPPING", "SHOUJI", "SHOW", "SI", "SILK", "SINA", "SINGLES", "SITE", "SJ", "SK", "SKI", "SKIN", "SKY", "SKYPE", "SL", "SLING", "SM", "SMART", "SMILE", "SN", "SNCF", "SO", "SOCCER", "SOCIAL", "SOFTBANK", "SOFTWARE", "SOHU", "SOLAR", "SOLUTIONS", "SONG", "SONY", "SOY", "SPA", "SPACE", "SPORT", "SPOT", "SR", "SRL", "SS", "ST", "STADA", "STAPLES", "STAR", "STATEBANK", "STATEFARM", "STC", "STCGROUP", "STOCKHOLM", "STORAGE", "STORE", "STREAM", "STUDIO", "STUDY", "STYLE", "SU", "SUCKS", "SUPPLIES", "SUPPLY", "SUPPORT", "SURF", "SURGERY", "SUZUKI", "SV", "SWATCH", "SWISS", "SX", "SY", "SYDNEY", "SYSTEMS", "SZ", "TAB", "TAIPEI", "TALK", "TAOBAO", "TARGET", "TATAMOTORS", "TATAR", "TATTOO", "TAX", "TAXI", "TC", "TCI", "TD", "TDK", "TEAM", "TECH", "TECHNOLOGY", "TEL", "TEMASEK", "TENNIS", "TEVA", "TF", "TG", "TH", "THD", "THEATER", "THEATRE", "TIAA", "TICKETS", "TIENDA", "TIPS", "TIRES", "TIROL", "TJ", "TJMAXX", "TJX", "TK", "TKMAXX", "TL", "TM", "TMALL", "TN", "TO", "TODAY", "TOKYO", "TOOLS", "TOP", "TORAY", "TOSHIBA", "TOTAL", "TOURS", "TOWN", "TOYOTA", "TOYS", "TR", "TRADE", "TRADING", "TRAINING", "TRAVEL", "TRAVELERS", "TRAVELERSINSURANCE", "TRUST", "TRV", "TT", "TUBE", "TUI", "TUNES", "TUSHU", "TV", "TVS", "TW", "TZ", "UA", "UBANK", "UBS", "UG", "UK", "UNICOM", "UNIVERSITY", "UNO", "UOL", "UPS", "US", "UY", "UZ", "VA", "VACATIONS", "VANA", "VANGUARD", "VC", "VE", "VEGAS", "VENTURES", "VERISIGN", "VERSICHERUNG", "VET", "VG", "VI", "VIAJES", "VIDEO", "VIG", "VIKING", "VILLAS", "VIN", "VIP", "VIRGIN", "VISA", "VISION", "VIVA", "VIVO", "VLAANDEREN", "VN", "VODKA", "VOLVO", "VOTE", "VOTING", "VOTO", "VOYAGE", "VU", "WALES", "WALMART", "WALTER", "WANG", "WANGGOU", "WATCH", "WATCHES", "WEATHER", "WEATHERCHANNEL", "WEBCAM", "WEBER", "WEBSITE", "WED", "WEDDING", "WEIBO", "WEIR", "WF", "WHOSWHO", "WIEN", "WIKI", "WILLIAMHILL", "WIN", "WINDOWS", "WINE", "WINNERS", "WME", "WOLTERSKLUWER", "WOODSIDE", "WORK", "WORKS", "WORLD", "WOW", "WS", "WTC", "WTF", "XBOX", "XEROX", "XIHUAN", "XIN", "XN--11B4C3D", "XN--1CK2E1B", "XN--1QQW23A", "XN--2SCRJ9C", "XN--30RR7Y", "XN--3BST00M", "XN--3DS443G", "XN--3E0B707E", "XN--3HCRJ9C", "XN--3PXU8K", "XN--42C2D9A", "XN--45BR5CYL", "XN--45BRJ9C", "XN--45Q11C", "XN--4DBRK0CE", "XN--4GBRIM", "XN--54B7FTA0CC", "XN--55QW42G", "XN--55QX5D", "XN--5SU34J936BGSG", "XN--5TZM5G", "XN--6FRZ82G", "XN--6QQ986B3XL", "XN--80ADXHKS", "XN--80AO21A", "XN--80AQECDR1A", "XN--80ASEHDB", "XN--80ASWG", "XN--8Y0A063A", "XN--90A3AC", "XN--90AE", "XN--90AIS", "XN--9DBQ2A", "XN--9ET52U", "XN--9KRT00A", "XN--B4W605FERD", "XN--BCK1B9A5DRE4C", "XN--C1AVG", "XN--C2BR7G", "XN--CCK2B3B", "XN--CCKWCXETD", "XN--CG4BKI", "XN--CLCHC0EA0B2G2A9GCD", "XN--CZR694B", "XN--CZRS0T", "XN--CZRU2D", "XN--D1ACJ3B", "XN--D1ALF", "XN--E1A4C", "XN--ECKVDTC9D", "XN--EFVY88H", "XN--FCT429K", "XN--FHBEI", "XN--FIQ228C5HS", "XN--FIQ64B", "XN--FIQS8S", "XN--FIQZ9S", "XN--FJQ720A", "XN--FLW351E", "XN--FPCRJ9C3D", "XN--FZC2C9E2C", "XN--FZYS8D69UVGM", "XN--G2XX48C", "XN--GCKR3F0F", "XN--GECRJ9C", "XN--GK3AT1E", "XN--H2BREG3EVE", "XN--H2BRJ9C", "XN--H2BRJ9C8C", "XN--HXT814E", "XN--I1B6B1A6A2E", "XN--IMR513N", "XN--IO0A7I", "XN--J1AEF", "XN--J1AMH", "XN--J6W193G", "XN--JLQ480N2RG", "XN--JVR189M", "XN--KCRX77D1X4A", "XN--KPRW13D", "XN--KPRY57D", "XN--KPUT3I", "XN--L1ACC", "XN--LGBBAT1AD8J", "XN--MGB9AWBF", "XN--MGBA3A3EJT", "XN--MGBA3A4F16A", "XN--MGBA7C0BBN0A", "XN--MGBAAM7A8H", "XN--MGBAB2BD", "XN--MGBAH1A3HJKRD", "XN--MGBAI9AZGQP6J", "XN--MGBAYH7GPA", "XN--MGBBH1A", "XN--MGBBH1A71E", "XN--MGBC0A9AZCG", "XN--MGBCA7DZDO", "XN--MGBCPQ6GPA1A", "XN--MGBERP4A5D4AR", "XN--MGBGU82A", "XN--MGBI4ECEXP", "XN--MGBPL2FH", "XN--MGBT3DHD", "XN--MGBTX2B", "XN--MGBX4CD0AB", "XN--MIX891F", "XN--MK1BU44C", "XN--MXTQ1M", "XN--NGBC5AZD", "XN--NGBE9E0A", "XN--NGBRX", "XN--NODE", "XN--NQV7F", "XN--NQV7FS00EMA", "XN--NYQY26A", "XN--O3CW4H", "XN--OGBPF8FL", "XN--OTU796D", "XN--P1ACF", "XN--P1AI", "XN--PGBS0DH", "XN--PSSY2U", "XN--Q7CE6A", "XN--Q9JYB4C", "XN--QCKA1PMC", "XN--QXA6A", "XN--QXAM", "XN--RHQV96G", "XN--ROVU88B", "XN--RVC1E0AM3E", "XN--S9BRJ9C", "XN--SES554G", "XN--T60B56A", "XN--TCKWE", "XN--TIQ49XQYJ", "XN--UNUP4Y", "XN--VERMGENSBERATER-CTB", "XN--VERMGENSBERATUNG-PWB", "XN--VHQUV", "XN--VUQ861B", "XN--W4R85EL8FHU5DNRA", "XN--W4RS40L", "XN--WGBH1C", "XN--WGBL6A", "XN--XHQ521B", "XN--XKC2AL3HYE2A", "XN--XKC2DL3A5EE0H", "XN--Y9A3AQ", "XN--YFRO4I67O", "XN--YGBI2AMMX", "XN--ZFR164B", "XXX", "XYZ", "YACHTS", "YAHOO", "YAMAXUN", "YANDEX", "YE", "YODOBASHI", "YOGA", "YOKOHAMA", "YOU", "YOUTUBE", "YT", "YUN", "ZA", "ZAPPOS", "ZARA", "ZERO", "ZIP", "ZM", "ZONE", "ZUERICH", "ZW"
-]
-
-
-const isValidTLD = (tld) => {
-  return validTLDs.includes(tld.toUpperCase());
-};
-
-const replaceSpacedLinks = (text) => {
-  console.log("Replacing spaced links");
-  const domainRegex = /(?<!\S)([a-zA-Z0-9-]+(?:\s*\.\s*[a-zA-Z0-9-]+)+(?:\s*\/\s*[a-zA-Z0-9-]+)*)\b(?!\.?\s*\n)/g;
-
-  return text.replace(domainRegex, (match, p1, offset, string) => {
-    const beforeMatch = string.substring(0, offset);
-    const afterMatch = string.substring(offset + match.length);
-    if (beforeMatch.lastIndexOf('<a') > beforeMatch.lastIndexOf('</a') ||
-      afterMatch.indexOf('</a') < afterMatch.indexOf('<a')) {
-      return match;
+// Main entry point for the content script
+(function() {
+  'use strict';
+  
+  // Configuration
+  const config = {
+    calendarIconSize: '20px',
+    calendarIconColor: '#5f6368', // Google's gray color
+    activeIconColor: '#1a73e8', // Google's blue color
+    datePickerWidth: '300px',
+    animationDuration: '0.2s'
+  };
+  
+  // Global state
+  let isDatePickerVisible = false;
+  let selectedStartDate = null;
+  let selectedEndDate = null;
+  
+  /**
+   * Initialize the extension
+   */
+  function init() {
+    console.log('Initializing Google Week by Week extension');
+    
+    // Check if we're on a Google search results page
+    if (isGoogleSearchPage()) {
+      initializeWeekByWeekSearch();
     }
-    const url = match.replace(/\s+/g, '');
-    const domain = url.split('/').shift();
-    console.log("URL:", domain);
-    console.log("Domain:", domain);
-    let tld = domain.split('.').pop();
-    // remove any route after the domain
-    tld = tld.split('/').shift();
-    console.log("TLD:", tld, isValidTLD(tld));
-    if (!isValidTLD(tld)) {
-      return match;
-    }
-    console.log("Replaced link:", match, "with:", url);
-    return `<a href="https://${url}" style="color: #1DA1F2; text-decoration: inherit;" target="_blank" rel="noopener noreferrer">${url}</a>`;
-  });
-};
-
-const renderTweet = (tweetElement) => {
-  if (tweetElement instanceof HTMLElement && !tweetElement.dataset.processed) {
-    const tweetText = tweetElement.querySelector('[data-testid="tweetText"]');
-    const tweetImage = tweetElement.querySelector('[data-testid="tweetPhoto"]');
-
-    if (tweetText) {
-      const originalText = tweetText.innerHTML || '';
-      const replacedText = replaceSpacedLinks(originalText);
-      tweetText.innerHTML = replacedText;
-    }
-
-    if (tweetImage && tweetImage instanceof HTMLElement) {
-      tweetImage.style.display = 'block';
-    }
-
-    tweetElement.dataset.processed = 'true';
+    
+    // Listen for page navigation (for SPA behavior)
+    observeUrlChanges();
   }
-};
-
-const main = () => {
-  if (isProcessing) return;
-  isProcessing = true;
-  console.log("Main function called");
-
-  const tweets = document.querySelectorAll('[data-testid="tweet"]');
-  for (const tweet of tweets) {
-    console.log("Processing tweet", tweet);
-    renderTweet(tweet);
+  
+  /**
+   * Check if the current page is a Google search page
+   */
+  function isGoogleSearchPage() {
+    return window.location.hostname.includes('google') && 
+           (window.location.pathname === '/search' || window.location.pathname === '/');
   }
-
-  console.log("Tweets processed");
-  isProcessing = false;
-};
-
-const checkMutations = () => {
-  console.log("Setting up mutation observer");
-  let observer = new MutationObserver((mutations, observer) => {
-    const tweets = document.querySelectorAll('[data-testid="tweet"]');
-    if (tweets.length > 0) {
-      const visibleTweets = Array.from(tweets).filter(tweet => {
-        const rect = tweet.getBoundingClientRect();
-        return rect.top >= 0 && rect.bottom <= window.innerHeight;
-      });
-
-      if (visibleTweets.length > 0) {
-        console.log("Visible tweets detected, calling main function");
-        main();
+  
+  /**
+   * Initialize the week by week search functionality
+   */
+  function initializeWeekByWeekSearch() {
+    // Create and inject the calendar icon
+    injectCalendarIcon();
+    
+    // Create the date picker component (initially hidden)
+    createDatePickerElement();
+    
+    // Check URL for existing date parameters and set them if present
+    checkForExistingDateParams();
+    
+    // Add event listeners
+    addEventListeners();
+  }
+  
+  /**
+   * Create and inject the calendar icon into the Google search bar
+   */
+  function injectCalendarIcon() {
+    // Remove any existing calendar icon first
+    removeExistingCalendarIcon();
+    
+    // Find the search form - there are a few possible selectors to try
+    const searchForm = document.querySelector('form[role="search"], form#tsf, form.search-form');
+    
+    if (!searchForm) {
+      console.error('Google Week by Week: Could not find the search form');
+      return;
+    }
+    
+    // Create the calendar icon element
+    const calendarIcon = document.createElement('div');
+    calendarIcon.id = 'gwbw-calendar-icon';
+    calendarIcon.className = 'gwbw-calendar-icon';
+    calendarIcon.innerHTML = createCalendarIconSVG();
+    calendarIcon.title = 'Search by week';
+    
+    // Add styles to the icon
+    calendarIcon.style.cssText = `
+      cursor: pointer;
+      width: ${config.calendarIconSize};
+      height: ${config.calendarIconSize};
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      border-radius: 50%;
+      transition: background-color 0.2s;
+      vertical-align: middle;
+      position: relative;
+      top: 6px;
+    `;
+    
+    // Find the right spot to insert the icon
+    // Usually next to the search button or inside the search input container
+    const searchButton = searchForm.querySelector('button[type="submit"], button[aria-label="Google Search"]');
+    
+    if (searchButton && searchButton.parentNode) {
+      searchButton.parentNode.insertBefore(calendarIcon, searchButton);
+      searchButton.parentNode.parentNode.style.alignItems = 'center'; // Align items in the search form
+      searchButton.parentNode.parentNode.style.verticalAlign = 'middle'; // Align items in the search form
+    } else {
+      // Fallback to append to the form
+      searchForm.appendChild(calendarIcon);
+    }
+    
+    console.log('Calendar icon injected');
+  }
+  
+  /**
+   * Create the SVG for the calendar icon
+   */
+  function createCalendarIconSVG() {
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${config.calendarIconSize}" height="${config.calendarIconSize}" 
+        viewBox="0 0 24 24" fill="none" stroke="${config.calendarIconColor}" 
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="16" y1="2" x2="16" y2="6"></line>
+        <line x1="8" y1="2" x2="8" y2="6"></line>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+      </svg>
+    `;
+  }
+  
+  /**
+   * Remove any existing calendar icon to avoid duplicates
+   */
+  function removeExistingCalendarIcon() {
+    const existingIcon = document.getElementById('gwbw-calendar-icon');
+    if (existingIcon) {
+      existingIcon.remove();
+    }
+  }
+  
+  /**
+   * Create the date picker element that will appear when clicking the calendar icon
+   */
+  function createDatePickerElement() {
+    // Remove any existing date picker first
+    removeExistingDatePicker();
+    
+    // Create the date picker container
+    const datePicker = document.createElement('div');
+    datePicker.id = 'gwbw-date-picker';
+    datePicker.className = 'gwbw-date-picker';
+    
+    // Add styles to the date picker
+    datePicker.style.cssText = `
+      position: absolute;
+      z-index: 9999;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      padding: 16px;
+      width: ${config.datePickerWidth};
+      display: none;
+      opacity: 0;
+      transition: opacity ${config.animationDuration} ease-in-out;
+      font-family: Arial, sans-serif;
+    `;
+    
+    // Create the content for the date picker
+    datePicker.innerHTML = `
+      <div style="margin-bottom: 16px; font-weight: bold; color: #202124;">
+        Search by Week
+      </div>
+      
+      <div style="margin-bottom: 16px;">
+        <div style="margin-bottom: 8px; color: #5f6368;">Start Date</div>
+        <input type="date" id="gwbw-start-date" style="width: 100%; padding: 8px; border: 1px solid #dfe1e5; border-radius: 4px;">
+      </div>
+      
+      <div style="margin-bottom: 16px;">
+        <div style="margin-bottom: 8px; color: #5f6368;">End Date</div>
+        <input type="date" id="gwbw-end-date" style="width: 100%; padding: 8px; border: 1px solid #dfe1e5; border-radius: 4px;">
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center;">
+          <button id="gwbw-prev-week" style="background: #f8f9fa; border: 1px solid #dadce0; border-radius: 4px 0 0 4px; padding: 8px; color: #3c4043; cursor: pointer; margin: 0; display: flex; align-items: center; justify-content: center; height: 36px;">
+            ${createArrowSVG('left')}
+          </button>
+          <button id="gwbw-quick-week" style="background: #f8f9fa; border: 1px solid #dadce0; border-left: none; border-right: none; padding: 8px 16px; color: #3c4043; cursor: pointer; margin: 0; height: 36px;">
+            Current Week
+          </button>
+          <button id="gwbw-next-week" style="background: #f8f9fa; border: 1px solid #dadce0; border-radius: 0 4px 4px 0; padding: 8px; color: #3c4043; cursor: pointer; margin: 0; display: flex; align-items: center; justify-content: center; height: 36px;">
+            ${createArrowSVG('right')}
+          </button>
+        </div>
+        <button id="gwbw-apply" style="background: #1a73e8; border: none; border-radius: 4px; padding: 8px 16px; color: white; cursor: pointer;">Apply</button>
+      </div>
+    `;
+    
+    // Add the date picker to the document body
+    document.body.appendChild(datePicker);
+    
+    console.log('Date picker created (initially hidden)');
+  }
+  
+  /**
+   * Remove any existing date picker to avoid duplicates
+   */
+  function removeExistingDatePicker() {
+    const existingPicker = document.getElementById('gwbw-date-picker');
+    if (existingPicker) {
+      existingPicker.remove();
+    }
+  }
+  
+  /**
+   * Show the date picker positioned near the calendar icon
+   */
+  function showDatePicker() {
+    const datePicker = document.getElementById('gwbw-date-picker');
+    const calendarIcon = document.getElementById('gwbw-calendar-icon');
+    
+    if (!datePicker || !calendarIcon) {
+      console.error('Date picker or calendar icon not found');
+      return;
+    }
+    
+    // Get the position of the calendar icon
+    const iconRect = calendarIcon.getBoundingClientRect();
+    
+    // Position the date picker below the icon
+    datePicker.style.top = (iconRect.bottom + window.scrollY + 8) + 'px';
+    datePicker.style.left = (iconRect.left + window.scrollX - 150) + 'px'; // Center the picker
+    
+    // Show the date picker with animation
+    datePicker.style.display = 'block';
+    
+    // Trigger reflow
+    datePicker.offsetHeight;
+    
+    // Make it visible
+    datePicker.style.opacity = '1';
+    
+    isDatePickerVisible = true;
+    updateCalendarIconState(true);
+  }
+  
+  /**
+   * Hide the date picker
+   */
+  function hideDatePicker() {
+    const datePicker = document.getElementById('gwbw-date-picker');
+    
+    if (!datePicker) {
+      return;
+    }
+    
+    // Hide with animation
+    datePicker.style.opacity = '0';
+    
+    // Wait for animation to complete before removing from DOM
+    setTimeout(() => {
+      datePicker.style.display = 'none';
+    }, parseFloat(config.animationDuration) * 1000);
+    
+    isDatePickerVisible = false;
+    updateCalendarIconState(false);
+  }
+  
+  /**
+   * Update the calendar icon's visual state (active or inactive)
+   */
+  function updateCalendarIconState(isActive) {
+    const calendarIcon = document.getElementById('gwbw-calendar-icon');
+    if (!calendarIcon) return;
+    
+    // Update the SVG color based on active state
+    const svg = calendarIcon.querySelector('svg');
+    if (svg) {
+      svg.setAttribute('stroke', isActive ? config.activeIconColor : config.calendarIconColor);
+    }
+    
+    // Update the background color
+    calendarIcon.style.backgroundColor = isActive ? 'rgba(26, 115, 232, 0.1)' : '';
+  }
+  
+  /**
+   * Check for existing date parameters in the URL and set the date picker values
+   */
+  function checkForExistingDateParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tbs = urlParams.get('tbs');
+    
+    if (tbs) {
+      // Parse the tbs parameter to extract date ranges
+      // The format is usually "cdr:1,cd_min:MM/DD/YYYY,cd_max:MM/DD/YYYY"
+      const match = tbs.match(/cd_min:(\d+)\/(\d+)\/(\d+),cd_max:(\d+)\/(\d+)\/(\d+)/);
+      
+      if (match) {
+        // Convert MM/DD/YYYY to YYYY-MM-DD for input[type=date]
+        const startMonth = match[1].padStart(2, '0');
+        const startDay = match[2].padStart(2, '0');
+        const startYear = match[3];
+        
+        const endMonth = match[4].padStart(2, '0');
+        const endDay = match[5].padStart(2, '0');
+        const endYear = match[6];
+        
+        selectedStartDate = `${startYear}-${startMonth}-${startDay}`;
+        selectedEndDate = `${endYear}-${endMonth}-${endDay}`;
+        
+        // Update the input fields when they become available
+        setTimeout(() => {
+          const startDateInput = document.getElementById('gwbw-start-date');
+          const endDateInput = document.getElementById('gwbw-end-date');
+          
+          if (startDateInput) startDateInput.value = selectedStartDate;
+          if (endDateInput) endDateInput.value = selectedEndDate;
+        }, 100);
+        
+        // Visual indicator that date filter is active
+        updateCalendarIconState(true);
       }
     }
-  });
-
-  observer.observe(document.body, {
-    subtree: true, childList: true, attributes: false
-  });
-};
-
-checkMutations();
-
-window.addEventListener('DOMContentLoaded', async () => {
-  console.log("DOM loaded");
-  console.log('TLDs:', validTLDs.length);
-  main();
-});
-
-window.addEventListener('popstate', () => {
-  console.log("Route changed");
-  main();
-});
-
-window.addEventListener("click", () => {
-  requestAnimationFrame(() => {
-    if (windowurl !== window.location.href) {
-      console.log("URL changed");
-      windowurl = window.location.href;
-      main();
+  }
+  
+  /**
+   * Add event listeners for the calendar icon and date picker
+   */
+  function addEventListeners() {
+    // Handle calendar icon click
+    document.addEventListener('click', function(e) {
+      // Click on calendar icon toggles the date picker
+      if (e.target.closest('#gwbw-calendar-icon')) {
+        if (isDatePickerVisible) {
+          hideDatePicker();
+        } else {
+          showDatePicker();
+        }
+        e.stopPropagation();
+      }
+      // Clicking outside the date picker closes it
+      else if (isDatePickerVisible && !e.target.closest('#gwbw-date-picker')) {
+        hideDatePicker();
+      }
+    });
+    
+    // Handle input changes and button clicks in the date picker
+    document.addEventListener('input', function(e) {
+      if (e.target.id === 'gwbw-start-date') {
+        selectedStartDate = e.target.value;
+      } else if (e.target.id === 'gwbw-end-date') {
+        selectedEndDate = e.target.value;
+      }
+    });
+    
+    document.addEventListener('click', function(e) {
+      // Apply button click
+      if (e.target.id === 'gwbw-apply') {
+        applyDateFilter();
+        hideDatePicker();
+      }
+      
+      // Current week button click
+      else if (e.target.id === 'gwbw-quick-week') {
+        setCurrentWeek();
+      }
+      
+      // Previous week button click
+      else if (e.target.closest('#gwbw-prev-week')) {
+        setPreviousWeek();
+      }
+      
+      // Next week button click
+      else if (e.target.closest('#gwbw-next-week')) {
+        setNextWeek();
+      }
+    });
+  }
+  
+  /**
+   * Set the date range to the current week (Sunday to Saturday)
+   */
+  function setCurrentWeek() {
+    const today = new Date();
+    const currentDay = today.getDay(); // 0 = Sunday, 6 = Saturday
+    
+    // Calculate the date for the Sunday of this week
+    const sundayDate = new Date(today);
+    sundayDate.setDate(today.getDate() - currentDay);
+    
+    // Calculate the date for the Saturday of this week
+    const saturdayDate = new Date(today);
+    saturdayDate.setDate(today.getDate() + (6 - currentDay));
+    
+    // Format dates as YYYY-MM-DD
+    selectedStartDate = formatDateForInput(sundayDate);
+    selectedEndDate = formatDateForInput(saturdayDate);
+    
+    // Update the input fields
+    const startDateInput = document.getElementById('gwbw-start-date');
+    const endDateInput = document.getElementById('gwbw-end-date');
+    
+    if (startDateInput) startDateInput.value = selectedStartDate;
+    if (endDateInput) endDateInput.value = selectedEndDate;
+  }
+  
+  /**
+   * Set the date range to the previous week based on current selection
+   */
+  function setPreviousWeek() {
+    // If no dates are selected, start with current week
+    if (!selectedStartDate || !selectedEndDate) {
+      setCurrentWeek();
+      return;
     }
-  });
-}, true);
-
-window.addEventListener('beforeunload', () => {
-  console.log("Page unloading");
-});
-
-window.addEventListener('hashchange', () => {
-  console.log("Hash changed");
-  main();
-});
+    
+    // Create date objects from the current selection
+    const startDate = new Date(selectedStartDate);
+    const endDate = new Date(selectedEndDate);
+    
+    // Move both dates back by 7 days
+    startDate.setDate(startDate.getDate() - 7);
+    endDate.setDate(endDate.getDate() - 7);
+    
+    // Update the selected dates
+    selectedStartDate = formatDateForInput(startDate);
+    selectedEndDate = formatDateForInput(endDate);
+    
+    // Update the input fields
+    const startDateInput = document.getElementById('gwbw-start-date');
+    const endDateInput = document.getElementById('gwbw-end-date');
+    
+    if (startDateInput) startDateInput.value = selectedStartDate;
+    if (endDateInput) endDateInput.value = selectedEndDate;
+  }
+  
+  /**
+   * Set the date range to the next week based on current selection
+   */
+  function setNextWeek() {
+    // If no dates are selected, start with current week
+    if (!selectedStartDate || !selectedEndDate) {
+      setCurrentWeek();
+      return;
+    }
+    
+    // Create date objects from the current selection
+    const startDate = new Date(selectedStartDate);
+    const endDate = new Date(selectedEndDate);
+    
+    // Move both dates forward by 7 days
+    startDate.setDate(startDate.getDate() + 7);
+    endDate.setDate(endDate.getDate() + 7);
+    
+    // Update the selected dates
+    selectedStartDate = formatDateForInput(startDate);
+    selectedEndDate = formatDateForInput(endDate);
+    
+    // Update the input fields
+    const startDateInput = document.getElementById('gwbw-start-date');
+    const endDateInput = document.getElementById('gwbw-end-date');
+    
+    if (startDateInput) startDateInput.value = selectedStartDate;
+    if (endDateInput) endDateInput.value = selectedEndDate;
+  }
+  
+  /**
+   * Create arrow SVG for navigation buttons
+   */
+  function createArrowSVG(direction) {
+    const points = direction === 'left' ?
+      "10,5 3,12 10,19" :  // Left arrow
+      "4,5 11,12 4,19";    // Right arrow
+      
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="24" 
+        viewBox="0 0 14 24" fill="none" stroke="currentColor" 
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="${points}"></polyline>
+      </svg>
+    `;
+  }
+  
+  /**
+   * Format a Date object as YYYY-MM-DD for input[type=date]
+   */
+  function formatDateForInput(date) {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  
+  /**
+   * Format a Date object as MM/DD/YYYY for Google's URL parameters
+   */
+  function formatDateForGoogle(dateStr) {
+    const date = new Date(dateStr);
+    const month = (date.getMonth() + 1).toString();
+    const day = date.getDate().toString();
+    const year = date.getFullYear();
+    return `${month}/${day}/${year}`;
+  }
+  
+  /**
+   * Apply the date filter by modifying the search URL
+   */
+  function applyDateFilter() {
+    if (!selectedStartDate || !selectedEndDate) {
+      console.error('Start and end dates must be selected');
+      return;
+    }
+    
+    // Get the current URL and parameters
+    const url = new URL(window.location.href);
+    const urlParams = new URLSearchParams(url.search);
+    
+    // Format dates for Google's URL parameters
+    const startDateFormatted = formatDateForGoogle(selectedStartDate);
+    const endDateFormatted = formatDateForGoogle(selectedEndDate);
+    
+    // Set the tbs parameter for date range
+    // Format: cdr:1,cd_min:MM/DD/YYYY,cd_max:MM/DD/YYYY
+    urlParams.set('tbs', `cdr:1,cd_min:${startDateFormatted},cd_max:${endDateFormatted}`);
+    
+    // Update the URL with the new parameters
+    url.search = urlParams.toString();
+    
+    // Navigate to the new URL
+    window.location.href = url.toString();
+  }
+  
+  /**
+   * Observe URL changes to re-initialize the extension when navigating
+   * between Google Search pages (handles AJAX navigation)
+   */
+  function observeUrlChanges() {
+    let lastUrl = location.href;
+    
+    // Create an observer instance
+    const observer = new MutationObserver(function() {
+      if (location.href !== lastUrl) {
+        lastUrl = location.href;
+        if (isGoogleSearchPage()) {
+          console.log('URL changed to a Google search page, reinitializing');
+          setTimeout(initializeWeekByWeekSearch, 500);
+        }
+      }
+    });
+    
+    // Start observing
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    // Also listen for popstate events for browser back/forward
+    window.addEventListener('popstate', function() {
+      if (isGoogleSearchPage()) {
+        setTimeout(initializeWeekByWeekSearch, 500);
+      }
+    });
+  }
+  
+  // Initialize the extension after the page has loaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
