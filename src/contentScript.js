@@ -31,8 +31,8 @@
       },
       twitter: {
         activeIconColor: '#1DA1F2', // Twitter blue
-        searchFormSelector: 'input[aria-label="Search query"]',
-        searchButtonSelector: 'div[data-testid="SearchBox_Search_Button"]',
+        searchFormSelector: 'button[aria-label="More"]',
+        searchButtonSelector: 'button[aria-label="More"]',
         urlParam: 'since',
         iconSize: '24px' // Bigger icon size for Twitter
       }
